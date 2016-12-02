@@ -76,9 +76,8 @@ params.Elitism = 0.1
 rng = NEAT.RNG()
 rng.TimeSeed()
 
-#input_size = 65
-input_size = 7
-inputs=[(x,-1.,0.) for x in np.linspace(-1,1,input_size)]
+input_size = 65
+inputs=[(x,-1.,0.) for x in np.linspace(-1,1,input_size-3)] # 62 raycasts
 inputs.extend([(-.2,-.8,.3),(.2,-.8,.3),(0.,-.6,-.5)])
 
 output_size = 2
@@ -164,7 +163,7 @@ while True: # Never ending generations
         # Check that input size in simulation matches server assumption
         i_size = len(observations[0]['observation'])
         if i_size != input_size:
-            print 'Input sizes dont match.\nCrashing...'
+            print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
 
         for obs in observations:
             net_id = obs['id']
@@ -193,7 +192,7 @@ while True: # Never ending generations
 
     # Print best fitness
     print("---------------------------")
-    # print("Generation: ", generation)
+    print("Generation: {0}".format(pop.GetGeneration()) )
     # print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
 
 
