@@ -186,13 +186,15 @@ while True: # Never ending generations
     fit_obs = {fit_val['id'] : fit_val['aliveTime'] for fit_val in fit_info}
 
     # Set fitnesses
-    #[genome_list[key].SetFitness(fit_obs[key]) for key in fit_obs]
+    [g.SetFitness( fit_obs[g.GetID()] ) for g in genome_list]
+    # [genome_list[key].SetFitness(fit_obs[key]) for key in fit_obs]
     #[genome.SetFitness(fitness) for genome, fitness in zip(genome_list, fitnesses)] 
     # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
 
     # Print best fitness
     print("---------------------------")
     print("Generation: {0}".format(pop.GetGeneration()) )
+    print("Best fitness in history: {0}".format(pop.GetBestFitnessEver()) )
     # print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
 
 
