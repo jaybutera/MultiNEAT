@@ -12,6 +12,8 @@ import MultiNEAT as NEAT
 import zmq
 import flatbuffers
 import AI.Store.Ids as s_i
+import AI.Obs.Observations as o_fb
+import AI.Obs.Creature as o_c
 from MultiNEAT import GetGenomeList, ZipFitness
 from MultiNEAT import EvaluateGenomeList_Serial
 
@@ -158,8 +160,6 @@ while True: # Never ending generations
     s_i.IdsStartIdvecVector(builder, num_ids)
 
     for i in reversed( nets.keys() ):
-    #for i in nets.keys():
-    #for i in range( num_ids ):
         builder.PrependByte(i)
 
     idvec = builder.EndVector(num_ids)
@@ -174,29 +174,36 @@ while True: # Never ending generations
     ids_fb = builder.Output()
     socket.send(ids_fb)
 
-    #ids = {'ids' : [id for id in nets.keys()]}
-    #socket.send_json(ids)
-
     # Step process
     while True:
-        req = socket.recv_json()
+        buf = socket.recv()
 
         # Epoch
-        if ('epoch' in req):
+        if ('epoch' in buf):
             break
 
-        observations = req['creatures']
+        obs = o_fb.Observations.GetRootAsObservations(buf, 0)
+        obs_len = obs.ObsLength()
+
+        observations = [obs.Obs(i) for i in range(obs_len)]
+        #observations = req['creatures']
         outputs = dict()
         action = []
 
         # Check that input size in simulation matches server assumption
-        i_size = len(observations[0]['observation'])
+        i_size = observations[0].ViewLength()
+        #i_size = len(observations[0]['observation'])
         if i_size != input_size:
             print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
+            break
 
-        for obs in observations:
-            net_id = obs['id']
-            inp_vec = obs['observation']
+        for o in observations:
+            #net_id = obs['id']
+            #inp_vec = obs['observation']
+            net_id = o.Id()
+            inp_vec = [o.View(i) for i in range(i_size)]
+            print 'input vector: '
+            print inp_vec
 
             net = nets[net_id]
             net.Input(inp_vec)
@@ -210,7 +217,7 @@ while True: # Never ending generations
         outputs['actions'] = action
         socket.send_json(outputs)
 
-    fit_info = req['epoch']
+    fit_info = buf['epoch']
 
     fit_obs = {fit_val['id'] : fit_val['aliveTime'] for fit_val in fit_info}
 

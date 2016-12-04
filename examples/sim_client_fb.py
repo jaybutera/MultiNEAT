@@ -2,6 +2,7 @@ import flatbuffers
 import AI.Obs.Observations as o_fb
 import AI.Obs.Creature as o_c
 import AI.Store.Ids as s_i
+import random
 import zmq
 
 port = '5560'
@@ -24,28 +25,33 @@ print 'Ids length: %d' % ids_len
 
 ids = []
 for i in range( ids_len ):
-    print ids_fb.Idvec(i)
-    #ids.append( ids_fb.Idvec(i) )
+    ids.append( ids_fb.Idvec(i) )
 
 print ids
 
-num_creat = 2
+num_creat = len(ids)
+view_size = 65
+
+# Build creatures list
 creatures = []
-for c in range(num_creat):
-    o_c.CreatureStartViewVector(builder,10)
+for c in ids:
+    # Build view for creature
+    o_c.CreatureStartViewVector(builder,view_size)
 
-    for i in reversed( range(0, 10) ):
-        builder.PrependByte(i)
+    for i in reversed( range(view_size) ):
+        builder.PrependByte(random.randint(0,5))
 
-    view = builder.EndVector(10)
+    view = builder.EndVector(view_size)
+    #
 
+    # Build creature in fb
     o_c.CreatureStart(builder)
     o_c.CreatureAddId(builder, c)
     o_c.CreatureAddView(builder, view)
 
     creatures.append( o_c.CreatureEnd(builder) )
 
-# Build observations vector
+# Build observations vector in fb
 o_fb.ObservationsStartObsVector(builder, num_creat)
 
 for c in creatures:
@@ -64,5 +70,3 @@ builder.Finish(o_offset)
 obs_fb = builder.Output()
 print 'Sending observation buffer...'
 socket.send(obs_fb)
-msg = socket.recv()
-print msg
