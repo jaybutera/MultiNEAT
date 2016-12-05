@@ -108,6 +108,9 @@ substrate.m_max_weight_and_bias = 8.0
 
 port = sys.argv[1]
 
+# Open log file
+f = open('log.txt', 'w')
+
 # ZMQ
 context = zmq.Context()
 socket = context.socket(zmq.REP)
@@ -192,9 +195,12 @@ while True: # Never ending generations
     # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
 
     # Print best fitness
-    print("---------------------------")
-    print("Generation: {0}".format(pop.GetGeneration()) )
-    print("Best fitness in history: {0}".format(pop.GetBestFitnessEver()) )
+    epoch_log = "---------------------------\n" + \
+                'Generation: %d\n' % pop.GetGeneration() + \
+                'Best fitness: %d\n' % pop.GetBestGenome().GetFitness() + \
+                "Best fitness in history: %d\n" % pop.GetBestFitnessEver()
+    print epoch_log
+    f.write(epoch_log)
     # print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
 
 
@@ -217,3 +223,5 @@ while True: # Never ending generations
 
     pop.Epoch()
     continue
+
+f.close()
