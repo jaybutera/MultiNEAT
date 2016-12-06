@@ -11,9 +11,12 @@ import pickle as pickle
 import MultiNEAT as NEAT
 import zmq
 import flatbuffers
+from flatbuffers import number_types as N
 import AI.Store.Ids as s_i
 import AI.Obs.Observations as o_fb
 import AI.Obs.Creature as o_c
+import AI.Control.Actions as c_a
+import AI.Control.Move as c_m
 from MultiNEAT import GetGenomeList, ZipFitness
 from MultiNEAT import EvaluateGenomeList_Serial
 
@@ -156,7 +159,6 @@ while True: # Never ending generations
 
     # Build id vector in fbuf
     num_ids = len(nets)
-    print 'num_ids: %s' % num_ids
     s_i.IdsStartIdvecVector(builder, num_ids)
 
     for i in reversed( nets.keys() ):
@@ -186,36 +188,71 @@ while True: # Never ending generations
         obs_len = obs.ObsLength()
 
         observations = [obs.Obs(i) for i in range(obs_len)]
-        #observations = req['creatures']
-        outputs = dict()
-        action = []
+        creat_obs = []
+        #outputs = dict()
+        #action = []
+
+        a_builder = flatbuffers.Builder(1024)
 
         # Check that input size in simulation matches server assumption
         i_size = observations[0].ViewLength()
-        #i_size = len(observations[0]['observation'])
         if i_size != input_size:
             print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
             break
 
         for o in observations:
-            #net_id = obs['id']
-            #inp_vec = obs['observation']
             net_id = o.Id()
             inp_vec = [o.View(i) for i in range(i_size)]
-            print 'input vector: '
-            print inp_vec
 
             net = nets[net_id]
             net.Input(inp_vec)
             net.Activate()
             outs = net.Output()
+
+            c_m.MoveStartOutputVector(a_builder, output_size)
+            #for out in outs:
+            for o in outs:
+                a_builder.PrependFloat32(o);
+                '''
+                a_builder.PrependFloat32Slot(int(i),
+                        float(o),
+                        # N.Float32Flags.py_type(ctypes.c_float(o).value),
+                        0.0)
+                '''
+
+            output = a_builder.EndVector(output_size)
+
+            # Store move table in py list
+            c_m.MoveStart(a_builder)
+            c_m.MoveAddId(a_builder, net_id)
+            c_m.MoveAddOutput(a_builder, output)
+            creat_obs.append( c_m.MoveEnd(a_builder) )
+
+            '''
             action.append({
                 'id' : net_id,
                 'action' : outs
             })
+            '''
 
-        outputs['actions'] = action
-        socket.send_json(outputs)
+        c_a.ActionsStartActionVector(a_builder, num_ids)
+
+        for o in creat_obs:
+            a_builder.PrependUOffsetTRelative(o)
+
+        action_vec = a_builder.EndVector(num_ids)
+
+        # Build Actions table
+        c_a.ActionsStart(a_builder)
+        c_a.ActionsAddAction(a_builder, action_vec)
+        a_offset = c_a.ActionsEnd(a_builder)
+        a_builder.Finish(a_offset)
+
+        action_fb = a_builder.Output()
+
+        socket.send(action_fb)
+        #outputs['actions'] = action
+        #socket.send_json(outputs)
 
     fit_info = buf['epoch']
 

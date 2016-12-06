@@ -1,0 +1,12 @@
+namespace AI.Control;
+
+table Actions {
+    action:[Move];
+}
+
+table Move {
+    id:ushort;
+    output:[float];
+}
+
+root_type Actions;

@@ -176,6 +176,7 @@ while True: # Never ending generations
             net.Input(inp_vec)
             net.Activate()
             outs = net.Output()
+            net.Adapt(params)
             action.append({
                 'id' : net_id,
                 'action' : outs
@@ -190,18 +191,15 @@ while True: # Never ending generations
 
     # Set fitnesses
     [g.SetFitness( fit_obs[g.GetID()] ) for g in genome_list]
-    # [genome_list[key].SetFitness(fit_obs[key]) for key in fit_obs]
-    #[genome.SetFitness(fitness) for genome, fitness in zip(genome_list, fitnesses)] 
-    # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
 
     # Print best fitness
+    best_genome = pop.GetBestGenome()
     epoch_log = "---------------------------\n" + \
                 'Generation: %d\n' % pop.GetGeneration() + \
-                'Best fitness: %d\n' % pop.GetBestGenome().GetFitness() + \
+                'Best fitness: %d\n' % best_genome.GetFitness() + \
                 "Best fitness in history: %d\n" % pop.GetBestFitnessEver()
     print epoch_log
     f.write(epoch_log)
-    # print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
 
 
     # Visualize best network's Genome
