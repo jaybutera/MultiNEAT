@@ -1,0 +1,12 @@
+namespace AI.Epoch;
+
+table Epoch {
+    scores:[Score];
+}
+
+table Score {
+    id:ushort;
+    fitness:float;
+}
+
+root_type Epoch;

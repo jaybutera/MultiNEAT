@@ -1,0 +1,7 @@
+namespace AI.Store;
+
+table Ids {
+    idvec:[ubyte];
+}
+
+root_type Ids;

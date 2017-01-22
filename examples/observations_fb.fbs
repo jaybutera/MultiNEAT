@@ -1,0 +1,12 @@
+namespace AI.Obs;
+
+table Creature {
+    id:ushort;
+    view:[ubyte];
+}
+
+table Observations {
+    obs:[Creature];
+}
+
+root_type Observations;
