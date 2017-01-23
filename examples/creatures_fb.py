@@ -182,6 +182,7 @@ while True: # Never ending generations
 
         # Epoch
         if ('epoch' in buf):
+            socket.send('recieved')
             break
 
         obs = o_fb.Observations.GetRootAsObservations(buf, 0)
@@ -254,9 +255,9 @@ while True: # Never ending generations
         #outputs['actions'] = action
         #socket.send_json(outputs)
 
-    fit_info = buf['epoch']
-
-    fit_obs = {fit_val['id'] : fit_val['aliveTime'] for fit_val in fit_info}
+    buf = socket.recv()
+    #fit_info = buf['epoch']
+    #fit_obs = {fit_val['id'] : fit_val['aliveTime'] for fit_val in fit_info}
 
     # Set fitnesses
     #[genome_list[key].SetFitness(fit_obs[key]) for key in fit_obs]

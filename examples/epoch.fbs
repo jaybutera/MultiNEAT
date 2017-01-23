@@ -1,7 +1,7 @@
-namespace AI.Epoch;
+namespace AI.Obs;
 
 table Epoch {
-    scores:[Score];
+    score:[Score];
 }
 
 table Score {
