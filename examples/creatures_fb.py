@@ -162,7 +162,7 @@ while True: # Never ending generations
     s_i.IdsStartIdvecVector(builder, num_ids)
 
     for i in reversed( nets.keys() ):
-        builder.PrependByte(i)
+        builder.PrependUint16(i)
 
     idvec = builder.EndVector(num_ids)
 
