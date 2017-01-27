@@ -122,6 +122,71 @@ socket = context.socket(zmq.REP)
 socket.bind('tcp://*:%s' % port)
 #socket.connect('tcp://localhost:'+port)
 
+# Time benchmark decortator
+def st_time(func):
+    """
+        st decorator to calculate the total time of a func
+    """
+
+    def st_func(*args, **keyArgs):
+        t1 = time.time()
+        r = func(*args, **keyArgs)
+        t2 = time.time()
+        print "Function=%s, Time (s)=%s" % (func.__name__, t2 - t1)
+        return r
+
+    return st_func
+
+'''
+Encapsulate observations fb message
+'''
+def fb_obs (buf):
+    t1 = time.time()
+    obs = o_fb.Observations.GetRootAsObservations(buf, 0)
+    obs_len = obs.ObsLength()
+
+    observations = [obs.Obs(i) for i in range(obs_len)]
+    t2 = time.time()
+
+    return observations
+
+def gen_actions (observations, a_builder):
+    #t1 = time.time()
+    for o in observations:
+        net_id = o.Id()
+        inp_vec = [o.View(i) for i in range(i_size)]
+
+        net = nets[net_id]
+        net.Input(inp_vec)
+        net.Activate()
+        outs = net.Output()
+
+        c_m.MoveStartOutputVector(a_builder, output_size)
+        #for out in outs:
+        for o in outs:
+            a_builder.PrependFloat32(o);
+
+        output = a_builder.EndVector(output_size)
+
+        # Store move table in py list
+        c_m.MoveStart(a_builder)
+        c_m.MoveAddId(a_builder, net_id)
+        c_m.MoveAddOutput(a_builder, output)
+        creat_actions.append( c_m.MoveEnd(a_builder) )
+
+    #t2 = time.time()
+    #print 'ANN sim (s) - {0}'.format(t2-t1)
+
+    c_a.ActionsStartActionVector(a_builder, num_ids)
+
+    for o in creat_actions:
+        a_builder.PrependUOffsetTRelative(o)
+
+    action_vec = a_builder.EndVector(num_ids)
+
+    return action_vec
+
+
 g = NEAT.Genome(0,
                 substrate.GetMinCPPNInputs()+1, # +1 for bias
                 0,
@@ -185,13 +250,11 @@ while True: # Never ending generations
             socket.send('recieved')
             break
 
-        obs = o_fb.Observations.GetRootAsObservations(buf, 0)
-        obs_len = obs.ObsLength()
+        # Build observations list
+        obs_timer = st_time( fb_obs )
+        observations = obs_timer(buf)
 
-        observations = [obs.Obs(i) for i in range(obs_len)]
-        creat_obs = []
-        #outputs = dict()
-        #action = []
+        creat_actions = []
 
         a_builder = flatbuffers.Builder(1024)
 
@@ -201,47 +264,9 @@ while True: # Never ending generations
             print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
             break
 
-        for o in observations:
-            net_id = o.Id()
-            inp_vec = [o.View(i) for i in range(i_size)]
-
-            net = nets[net_id]
-            net.Input(inp_vec)
-            net.Activate()
-            outs = net.Output()
-
-            c_m.MoveStartOutputVector(a_builder, output_size)
-            #for out in outs:
-            for o in outs:
-                a_builder.PrependFloat32(o);
-                '''
-                a_builder.PrependFloat32Slot(int(i),
-                        float(o),
-                        # N.Float32Flags.py_type(ctypes.c_float(o).value),
-                        0.0)
-                '''
-
-            output = a_builder.EndVector(output_size)
-
-            # Store move table in py list
-            c_m.MoveStart(a_builder)
-            c_m.MoveAddId(a_builder, net_id)
-            c_m.MoveAddOutput(a_builder, output)
-            creat_obs.append( c_m.MoveEnd(a_builder) )
-
-            '''
-            action.append({
-                'id' : net_id,
-                'action' : outs
-            })
-            '''
-
-        c_a.ActionsStartActionVector(a_builder, num_ids)
-
-        for o in creat_obs:
-            a_builder.PrependUOffsetTRelative(o)
-
-        action_vec = a_builder.EndVector(num_ids)
+        # Simulate ANNs and generate fb action vector
+        a_timer = st_time( gen_actions )
+        action_vec = a_timer (observations, a_builder)
 
         # Build Actions table
         c_a.ActionsStart(a_builder)
