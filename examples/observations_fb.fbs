@@ -1,8 +1,15 @@
 namespace AI.Obs;
 
+table Smell {
+    protein: float;
+    starch:  float;
+    fat:     float;
+}
+
 table Creature {
     id:ushort;
-    view:[ubyte];
+    //view:[ubyte];
+    smell:Smell;
 }
 
 table Observations {

@@ -23,7 +23,7 @@ from MultiNEAT import EvaluateGenomeList_Serial
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 params = NEAT.Parameters()
-params.PopulationSize = 65
+params.PopulationSize = 5
 
 params.DynamicCompatibility = True
 params.CompatTreshold = 2.0
@@ -84,9 +84,9 @@ params.Elitism = 0.1
 rng = NEAT.RNG()
 rng.TimeSeed()
 
-input_size = 65
-inputs=[(x,-1.,0.) for x in np.linspace(-1,1,input_size-3)] # 62 raycasts
-inputs.extend([(-.2,-.8,.3),(.2,-.8,.3),(0.,-.6,-.5)])
+input_size = 3
+inputs=[(x,-1.,0.) for x in np.linspace(-1,1,input_size)] # 62 raycasts
+#inputs.extend([(-.2,-.8,.3),(.2,-.8,.3),(0.,-.6,-.5)])
 
 output_size = 2
 outputs=[(x,1.,0.) for x in np.linspace(-1,1,output_size)]
@@ -154,7 +154,11 @@ def gen_actions (observations, a_builder):
     #t1 = time.time()
     for o in observations:
         net_id = o.Id()
-        inp_vec = [o.View(i) for i in range(i_size)]
+
+        inp_vec = [ \
+            o.Smell().Protein(), \
+            o.Smell().Starch(), \
+            o.Smell().Fat()]
 
         net = nets[net_id]
         net.Input(inp_vec)
@@ -259,10 +263,12 @@ while True: # Never ending generations
         a_builder = flatbuffers.Builder(1024)
 
         # Check that input size in simulation matches server assumption
+        '''
         i_size = observations[0].ViewLength()
         if i_size != input_size:
             print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
             break
+        '''
 
         # Simulate ANNs and generate fb action vector
         a_timer = st_time( gen_actions )
