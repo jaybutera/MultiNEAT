@@ -20,6 +20,72 @@ builder = flatbuffers.Builder(1024)
 # Start command
 socket.send('start')
 
+def send_obs(ids):
+    # Build creatures list
+    creatures = []
+    for c in ids:
+        # Build view for creature
+        '''
+        o_c.CreatureStartViewVector(builder,view_size)
+
+        for i in reversed( range(view_size) ):
+            builder.PrependByte(random.randint(0,5))
+
+        view = builder.EndVector(view_size)
+        #
+        '''
+
+        # Build creature in fb
+        o_c.CreatureStart(builder)
+        o_c.CreatureAddId(builder, c)
+        o_c.CreatureAddSmell(builder, o_smell.CreateSmell(builder, 1.0, 1.0, 1.0))
+
+        #o_c.CreatureAddView(builder, view)
+
+        creatures.append( o_c.CreatureEnd(builder) )
+
+    # Build observations vector in fb
+    o_fb.ObservationsStartObsVector(builder, num_creat)
+
+    for c in creatures:
+        builder.PrependUOffsetTRelative(c)
+
+    obs = builder.EndVector(num_creat)
+    #
+
+    # Builder Observations table
+    o_fb.ObservationsStart(builder)
+    o_fb.ObservationsAddObs(builder, obs)
+    o_offset = o_fb.ObservationsEnd(builder)
+
+    builder.Finish(o_offset)
+
+    obs_fb = builder.Output()
+
+    print 'Sending observation buffer...'
+    socket.send(obs_fb)
+
+def get_actions():
+    # Get action vector
+    buf = socket.recv()
+
+    actions = c_a.Actions.GetRootAsActions(buf, 0)
+    action_len = actions.ActionLength()
+
+    moves_fb = [actions.Action(i) for i in range(action_len)]
+
+    out_size = moves_fb[0].OutputLength()
+    moves = {}
+    for m in moves_fb:
+        output = [m.Output(i) for i in range(out_size)]
+        moves[m.Id()] = output
+
+    print 'Action vector'
+    print moves
+
+
+
+
 for generation in range(5):
     # Get id vector
     buf = bytearray(socket.recv())
@@ -36,77 +102,14 @@ for generation in range(5):
     print ids
 
     num_creat = len(ids)
-    view_size = 65
+    #view_size = 65
 
-    for step in range(8):
-        # Build creatures list
-        creatures = []
-        for c in ids:
-            # Build view for creature
-            '''
-            o_c.CreatureStartViewVector(builder,view_size)
+    for step in range(5):
+        # For and send observation
+        send_obs(ids)
 
-            for i in reversed( range(view_size) ):
-                builder.PrependByte(random.randint(0,5))
-
-            view = builder.EndVector(view_size)
-            #
-            '''
-
-            # Build smell
-            '''
-            o_s.SmellStart(builder)
-            o_s.SmellAddProtein(builder, 1.0)
-            o_s.SmellAddStarch(builder, 1.0)
-            o_s.SmellAddFat(builder, 1.0)
-            smell_offset = o_s.SmellEnd(builder)
-            '''
-
-            # Build creature in fb
-            o_c.CreatureStart(builder)
-            o_c.CreatureAddId(builder, c)
-            o_c.CreatureAddSmell(builder, o_smell.CreateSmell(builder, 1.0, 1.0, 1.0))
-
-            #o_c.CreatureAddView(builder, view)
-
-            creatures.append( o_c.CreatureEnd(builder) )
-
-        # Build observations vector in fb
-        o_fb.ObservationsStartObsVector(builder, num_creat)
-
-        for c in creatures:
-            builder.PrependUOffsetTRelative(c)
-
-        obs = builder.EndVector(num_creat)
-        #
-
-        # Builder Observations table
-        o_fb.ObservationsStart(builder)
-        o_fb.ObservationsAddObs(builder, obs)
-        o_offset = o_fb.ObservationsEnd(builder)
-
-        builder.Finish(o_offset)
-
-        obs_fb = builder.Output()
-        print 'Sending observation buffer...'
-        socket.send(obs_fb)
-
-        # Get action vector
-        buf = socket.recv()
-
-        actions = c_a.Actions.GetRootAsActions(buf, 0)
-        action_len = actions.ActionLength()
-
-        moves_fb = [actions.Action(i) for i in range(action_len)]
-
-        out_size = moves_fb[0].OutputLength()
-        moves = {}
-        for m in moves_fb:
-            output = [m.Output(i) for i in range(out_size)]
-            moves[m.Id()] = output
-
-        print 'Action vector'
-        print moves
+        # Recieve actions
+        get_actions()
 
     socket.send('epoch')
     socket.recv()
