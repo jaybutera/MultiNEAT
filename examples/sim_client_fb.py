@@ -1,6 +1,7 @@
 import flatbuffers
 import AI.Obs.Observations as o_fb
 import AI.Obs.Creature as o_c
+import AI.Obs.Smell as o_smell
 import AI.Obs.Epoch as o_e
 import AI.Obs.Score as o_s
 import AI.Store.Ids as s_i
@@ -9,7 +10,7 @@ import AI.Control.Move as c_m
 import random
 import zmq
 
-port = '5560'
+port = '5559'
 context = zmq.Context()
 socket = context.socket(zmq.REQ)
 socket.connect('tcp://localhost:%s' % port)
@@ -42,6 +43,7 @@ for generation in range(5):
         creatures = []
         for c in ids:
             # Build view for creature
+            '''
             o_c.CreatureStartViewVector(builder,view_size)
 
             for i in reversed( range(view_size) ):
@@ -49,11 +51,23 @@ for generation in range(5):
 
             view = builder.EndVector(view_size)
             #
+            '''
+
+            # Build smell
+            '''
+            o_s.SmellStart(builder)
+            o_s.SmellAddProtein(builder, 1.0)
+            o_s.SmellAddStarch(builder, 1.0)
+            o_s.SmellAddFat(builder, 1.0)
+            smell_offset = o_s.SmellEnd(builder)
+            '''
 
             # Build creature in fb
             o_c.CreatureStart(builder)
             o_c.CreatureAddId(builder, c)
-            o_c.CreatureAddView(builder, view)
+            o_c.CreatureAddSmell(builder, o_smell.CreateSmell(builder, 1.0, 1.0, 1.0))
+
+            #o_c.CreatureAddView(builder, view)
 
             creatures.append( o_c.CreatureEnd(builder) )
 

@@ -1,6 +1,6 @@
 namespace AI.Obs;
 
-table Smell {
+struct Smell {
     protein: float;
     starch:  float;
     fat:     float;

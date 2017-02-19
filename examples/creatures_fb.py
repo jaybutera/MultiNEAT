@@ -132,7 +132,7 @@ def st_time(func):
         t1 = time.time()
         r = func(*args, **keyArgs)
         t2 = time.time()
-        print "Function=%s, Time (s)=%s" % (func.__name__, t2 - t1)
+        #print "Function=%s, Time (s)=%s" % (func.__name__, t2 - t1)
         return r
 
     return st_func
@@ -151,6 +151,8 @@ def fb_obs (buf):
     return observations
 
 def gen_actions (observations, a_builder):
+    creat_actions = []
+
     #t1 = time.time()
     for o in observations:
         net_id = o.Id()
@@ -164,6 +166,7 @@ def gen_actions (observations, a_builder):
         net.Input(inp_vec)
         net.Activate()
         outs = net.Output()
+        #print '[{0}] : {1}'.format(net_id, outs)
 
         c_m.MoveStartOutputVector(a_builder, output_size)
         #for out in outs:
@@ -183,6 +186,7 @@ def gen_actions (observations, a_builder):
 
     c_a.ActionsStartActionVector(a_builder, num_ids)
 
+    print len(creat_actions)
     for o in creat_actions:
         a_builder.PrependUOffsetTRelative(o)
 
@@ -257,8 +261,6 @@ while True: # Never ending generations
         # Build observations list
         obs_timer = st_time( fb_obs )
         observations = obs_timer(buf)
-
-        creat_actions = []
 
         a_builder = flatbuffers.Builder(1024)
 
