@@ -184,13 +184,13 @@ def gen_actions (observations, a_builder):
     #t2 = time.time()
     #print 'ANN sim (s) - {0}'.format(t2-t1)
 
-    c_a.ActionsStartActionVector(a_builder, num_ids)
+    c_a.ActionsStartActionVector(a_builder, len(creat_actions))
 
-    print len(creat_actions)
+    print 'Num creats: {0}'.format(len(creat_actions))
     for o in creat_actions:
         a_builder.PrependUOffsetTRelative(o)
 
-    action_vec = a_builder.EndVector(num_ids)
+    action_vec = a_builder.EndVector(len(creat_actions))
 
     return action_vec
 

@@ -45,12 +45,12 @@ def send_obs(ids):
         creatures.append( o_c.CreatureEnd(builder) )
 
     # Build observations vector in fb
-    o_fb.ObservationsStartObsVector(builder, num_creat)
+    o_fb.ObservationsStartObsVector(builder, len(ids))
 
     for c in creatures:
         builder.PrependUOffsetTRelative(c)
 
-    obs = builder.EndVector(num_creat)
+    obs = builder.EndVector( len(ids) )
     #
 
     # Builder Observations table
@@ -65,12 +65,15 @@ def send_obs(ids):
     print 'Sending observation buffer...'
     socket.send(obs_fb)
 
+
 def get_actions():
     # Get action vector
     buf = socket.recv()
 
     actions = c_a.Actions.GetRootAsActions(buf, 0)
     action_len = actions.ActionLength()
+    print 'Num actions'
+    print action_len
 
     moves_fb = [actions.Action(i) for i in range(action_len)]
 
@@ -89,7 +92,6 @@ def get_actions():
 for generation in range(5):
     # Get id vector
     buf = bytearray(socket.recv())
-    print type(buf)
     ids_fb = s_i.Ids.GetRootAsIds(buf, 0)
 
     ids_len = ids_fb.IdvecLength()
@@ -104,6 +106,15 @@ for generation in range(5):
     num_creat = len(ids)
     #view_size = 65
 
+    for step in range(5):
+        # For and send observation
+        send_obs(ids)
+
+        # Recieve actions
+        get_actions()
+
+    # Now with less creatures (some die)
+    ids = ids[:-1]
     for step in range(5):
         # For and send observation
         send_obs(ids)
