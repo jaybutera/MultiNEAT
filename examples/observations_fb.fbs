@@ -6,10 +6,16 @@ struct Smell {
     fat:     float;
 }
 
+struct Vec2 {
+    x: float;
+    y: float;
+}
+
 table Creature {
     id:ushort;
     //view:[ubyte];
     smell:Smell;
+    accel:Vec2;
 }
 
 table Observations {

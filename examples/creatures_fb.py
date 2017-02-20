@@ -85,8 +85,10 @@ rng = NEAT.RNG()
 rng.TimeSeed()
 
 input_size = 3
-inputs=[(x,-1.,0.) for x in np.linspace(-1,1,input_size)] # 62 raycasts
-#inputs.extend([(-.2,-.8,.3),(.2,-.8,.3),(0.,-.6,-.5)])
+# Smell inputs
+inputs=[(x,-1.,0.) for x in np.linspace(-.3,.3,input_size)]
+# Acceleration inputs
+inputs.extend([(-.2,-.8,.3),(.2,-.8,.3)])
 
 output_size = 2
 outputs=[(x,1.,0.) for x in np.linspace(-1,1,output_size)]
@@ -160,13 +162,15 @@ def gen_actions (observations, a_builder):
         inp_vec = [ \
             o.Smell().Protein(), \
             o.Smell().Starch(), \
-            o.Smell().Fat()]
+            o.Smell().Fat(), \
+            o.Accel().X(), \
+            o.Accel().Y()]
 
         net = nets[net_id]
         net.Input(inp_vec)
         net.Activate()
         outs = net.Output()
-        #print '[{0}] : {1}'.format(net_id, outs)
+        print '[{0}] : {1}'.format(net_id, outs)
 
         c_m.MoveStartOutputVector(a_builder, output_size)
         #for out in outs:
@@ -184,13 +188,14 @@ def gen_actions (observations, a_builder):
     #t2 = time.time()
     #print 'ANN sim (s) - {0}'.format(t2-t1)
 
-    c_a.ActionsStartActionVector(a_builder, len(creat_actions))
+    num_creats = len(creat_actions)
+    c_a.ActionsStartActionVector(a_builder, num_creats)
 
-    print 'Num creats: {0}'.format(len(creat_actions))
+    print 'Num creats: {0}'.format(num_creats)
     for o in creat_actions:
         a_builder.PrependUOffsetTRelative(o)
 
-    action_vec = a_builder.EndVector(len(creat_actions))
+    action_vec = a_builder.EndVector(num_creats)
 
     return action_vec
 
