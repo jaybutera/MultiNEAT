@@ -15,6 +15,7 @@ from flatbuffers import number_types as N
 import AI.Store.Ids as s_i
 import AI.Obs.Observations as o_fb
 import AI.Obs.Creature as o_c
+import AI.Obs.Epoch as e_fb
 import AI.Control.Actions as c_a
 import AI.Control.Move as c_m
 from MultiNEAT import GetGenomeList, ZipFitness
@@ -23,7 +24,7 @@ from MultiNEAT import EvaluateGenomeList_Serial
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 params = NEAT.Parameters()
-params.PopulationSize = 5
+params.PopulationSize = 15
 
 params.DynamicCompatibility = True
 params.CompatTreshold = 2.0
@@ -170,7 +171,7 @@ def gen_actions (observations, a_builder):
         net.Input(inp_vec)
         net.Activate()
         outs = net.Output()
-        print '[{0}] : {1}'.format(net_id, outs)
+        #print '[{0}] : {1}'.format(net_id, outs)
 
         c_m.MoveStartOutputVector(a_builder, output_size)
         #for out in outs:
@@ -191,7 +192,6 @@ def gen_actions (observations, a_builder):
     num_creats = len(creat_actions)
     c_a.ActionsStartActionVector(a_builder, num_creats)
 
-    print 'Num creats: {0}'.format(num_creats)
     for o in creat_actions:
         a_builder.PrependUOffsetTRelative(o)
 
@@ -226,6 +226,11 @@ print 'connected...'
 while True: # Never ending generations
     # Evaluate genomes
     genome_list = NEAT.GetGenomeList(pop)
+
+    # For convenience
+    genome_dict = {}
+    for g in genome_list:
+        genome_dict[g.GetID()] = g
 
     # Construct networks
     nets = {}
@@ -294,18 +299,20 @@ while True: # Never ending generations
         #socket.send_json(outputs)
 
     buf = socket.recv()
-    #fit_info = buf['epoch']
-    #fit_obs = {fit_val['id'] : fit_val['aliveTime'] for fit_val in fit_info}
 
-    # Set fitnesses
-    #[genome_list[key].SetFitness(fit_obs[key]) for key in fit_obs]
-    #[genome.SetFitness(fitness) for genome, fitness in zip(genome_list, fitnesses)] 
+    # Apply fitness scores
+    epoch = e_fb.Epoch.GetRootAsEpoch(buf, 0)
+    score_len = epoch.ScoreLength()
+
+    fit_scores = [epoch.Score(i) for i in range(score_len)]
+    [genome_dict[s.Id()].SetFitness(s.Fitness()) for s in fit_scores]
+
     # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
 
     # Print best fitness
     print("---------------------------")
     print("Generation: {0}".format(pop.GetGeneration()) )
-    # print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
+    print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
 
 
     # Visualize best network's Genome
