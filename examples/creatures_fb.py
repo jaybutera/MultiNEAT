@@ -21,22 +21,24 @@ import AI.Control.Move as c_m
 from MultiNEAT import GetGenomeList, ZipFitness
 from MultiNEAT import EvaluateGenomeList_Serial
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import concurrent.futures
+#from concurrent.futures import ProcessPoolExecutor, as_completed
+#executor = ProcessPoolExecutor(4)
 
 params = NEAT.Parameters()
-params.PopulationSize = 15
+params.PopulationSize = 32
 
 params.DynamicCompatibility = True
 params.CompatTreshold = 2.0
 params.YoungAgeTreshold = 15
-params.SpeciesMaxStagnation = 100
+params.SpeciesMaxStagnation = 25
 params.OldAgeTreshold = 35
-params.MinSpecies = 5
+params.MinSpecies = 4
 params.MaxSpecies = 10
 params.RouletteWheelSelection = False
 
 params.MutateRemLinkProb = 0.02
-params.RecurrentProb = 0
+params.RecurrentProb = 0.05
 params.OverallMutationRate = 0.15
 params.MutateAddLinkProb = 0.08
 params.MutateAddNeuronProb = 0.01
@@ -85,7 +87,7 @@ params.Elitism = 0.1
 rng = NEAT.RNG()
 rng.TimeSeed()
 
-input_size = 3
+input_size = 1
 # Smell inputs
 inputs=[(x,-1.,0.) for x in np.linspace(-.3,.3,input_size)]
 # Acceleration inputs
@@ -102,11 +104,11 @@ substrate = NEAT.Substrate(inputs,
 
 substrate.m_allow_output_hidden_links = False
 substrate.m_allow_output_output_links = False
-substrate.m_allow_looped_hidden_links = False
+substrate.m_allow_looped_hidden_links = True
 substrate.m_allow_looped_output_links = False
 
 substrate.m_allow_input_hidden_links = True
-substrate.m_allow_input_output_links = False
+substrate.m_allow_input_output_links = True
 substrate.m_allow_hidden_output_links = True
 substrate.m_allow_hidden_hidden_links = True
 
@@ -131,11 +133,12 @@ def st_time(func):
         st decorator to calculate the total time of a func
     """
 
-    def st_func(*args, **keyArgs):
+    def st_func(iter, *args, **keyArgs):
         t1 = time.time()
-        r = func(*args, **keyArgs)
+        r = func(iter, *args, **keyArgs)
         t2 = time.time()
-        #print "Function=%s, Time (s)=%s" % (func.__name__, t2 - t1)
+        if iter % 100 == 0:
+            print "Function=%s, Time (ms)=%s" % (func.__name__, (t2 - t1)*1000)
         return r
 
     return st_func
@@ -143,7 +146,7 @@ def st_time(func):
 '''
 Encapsulate observations fb message
 '''
-def fb_obs (buf):
+def fb_obs (iter, buf):
     t1 = time.time()
     obs = o_fb.Observations.GetRootAsObservations(buf, 0)
     obs_len = obs.ObsLength()
@@ -153,19 +156,63 @@ def fb_obs (buf):
 
     return observations
 
-def gen_actions (observations, a_builder):
+def step_nn (o): # o is observation
+    net_id = o.Id()
+
+    inp_vec = [ \
+        #o.Smell().Protein(), \
+        #o.Smell().Starch(), \
+        o.Smell().Fat(), \
+        o.Accel().X(), \
+        o.Accel().Y(),
+        1]
+
+    net = nets[net_id]
+    net.Input(inp_vec)
+    net.Activate()
+    outs = net.Output()
+
+    return outs
+
+
+def gen_actions (iter, observations, builder):
     creat_actions = []
 
     #t1 = time.time()
+    #actions = []
+    #executor = concurrent.futures.ProcessPoolExecutor(8)
+    #futures = [executor.submit(step_nn, o) for o in observations]
+
+    '''
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for o, outs in zip(observations, executor.map(step_nn, observations)):
+            net_id = o.Id()
+
+            c_m.MoveStartOutputVector(builder, output_size)
+            #for out in outs:
+            for o in outs:
+                builder.PrependFloat32(o);
+
+            output = builder.EndVector(output_size)
+
+            # Store move table in py list
+            c_m.MoveStart(builder)
+            c_m.MoveAddId(builder, net_id)
+            c_m.MoveAddOutput(builder, output)
+            creat_actions.append( c_m.MoveEnd(builder) )
+
+
+    '''
     for o in observations:
         net_id = o.Id()
 
         inp_vec = [ \
-            o.Smell().Protein(), \
-            o.Smell().Starch(), \
+            #o.Smell().Protein(), \
+            #o.Smell().Starch(), \
             o.Smell().Fat(), \
             o.Accel().X(), \
-            o.Accel().Y()]
+            o.Accel().Y(),
+            1.0]
 
         net = nets[net_id]
         net.Input(inp_vec)
@@ -173,29 +220,34 @@ def gen_actions (observations, a_builder):
         outs = net.Output()
         #print '[{0}] : {1}'.format(net_id, outs)
 
-        c_m.MoveStartOutputVector(a_builder, output_size)
+        c_m.MoveStartOutputVector(builder, output_size)
         #for out in outs:
         for o in outs:
-            a_builder.PrependFloat32(o);
+            builder.PrependFloat32(o);
 
-        output = a_builder.EndVector(output_size)
+        output = builder.EndVector(output_size)
 
         # Store move table in py list
-        c_m.MoveStart(a_builder)
-        c_m.MoveAddId(a_builder, net_id)
-        c_m.MoveAddOutput(a_builder, output)
-        creat_actions.append( c_m.MoveEnd(a_builder) )
+        c_m.MoveStart(builder)
+        c_m.MoveAddId(builder, net_id)
+        c_m.MoveAddOutput(builder, output)
+        creat_actions.append( c_m.MoveEnd(builder) )
 
     #t2 = time.time()
     #print 'ANN sim (s) - {0}'.format(t2-t1)
 
+    t1 = time.time()
     num_creats = len(creat_actions)
-    c_a.ActionsStartActionVector(a_builder, num_creats)
+    c_a.ActionsStartActionVector(builder, num_creats)
 
     for o in creat_actions:
-        a_builder.PrependUOffsetTRelative(o)
+        builder.PrependUOffsetTRelative(o)
 
-    action_vec = a_builder.EndVector(num_creats)
+    action_vec = builder.EndVector(num_creats)
+    t2 = time.time()
+
+    if iter % 100 == 0:
+        print "Action serialize (ms)=%s" % ((t2 - t1)*1000)
 
     return action_vec
 
@@ -205,15 +257,15 @@ g = NEAT.Genome(0,
                 0,
                 substrate.GetMinCPPNOutputs(),
                 False,
-                NEAT.ActivationFunction.TANH,
-                NEAT.ActivationFunction.TANH,
+                NEAT.ActivationFunction.SIGNED_SIGMOID,
+                NEAT.ActivationFunction.SIGNED_SIGMOID,
                 0,
                 params)
 
 pop = NEAT.Population(g, params, True, 1.0, 0)
 
 # Initialize flat buffers builder
-builder = flatbuffers.Builder(1024)
+#builder = flatbuffers.Builder(1024)
 
 while True:
     msg = socket.recv()
@@ -224,6 +276,8 @@ print 'connected...'
 
 #for generation in range(1000):
 while True: # Never ending generations
+    builder = flatbuffers.Builder(2048)
+    iteration = 0
     # Evaluate genomes
     genome_list = NEAT.GetGenomeList(pop)
 
@@ -270,9 +324,7 @@ while True: # Never ending generations
 
         # Build observations list
         obs_timer = st_time( fb_obs )
-        observations = obs_timer(buf)
-
-        a_builder = flatbuffers.Builder(1024)
+        observations = obs_timer(iteration, buf)
 
         # Check that input size in simulation matches server assumption
         '''
@@ -283,20 +335,28 @@ while True: # Never ending generations
         '''
 
         # Simulate ANNs and generate fb action vector
+        t_begin = time.time()
         a_timer = st_time( gen_actions )
-        action_vec = a_timer (observations, a_builder)
+        action_vec = a_timer (iteration, observations, builder)
 
         # Build Actions table
-        c_a.ActionsStart(a_builder)
-        c_a.ActionsAddAction(a_builder, action_vec)
-        a_offset = c_a.ActionsEnd(a_builder)
-        a_builder.Finish(a_offset)
+        t1 = time.time()
+        c_a.ActionsStart(builder)
+        c_a.ActionsAddAction(builder, action_vec)
+        a_offset = c_a.ActionsEnd(builder)
+        builder.Finish(a_offset)
 
-        action_fb = a_builder.Output()
+        action_fb = builder.Output()
 
         socket.send(action_fb)
+        t2 = time.time()
+
+        if (iteration % 100 == 0):
+            print "Build time: {0}".format((t2-t1)*1000)
+            print "Total time: {0}".format((t2-t_begin)*1000)
         #outputs['actions'] = action
         #socket.send_json(outputs)
+        iteration += 1
 
     buf = socket.recv()
 
