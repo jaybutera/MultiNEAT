@@ -16,6 +16,7 @@ table Creature {
     //view:[ubyte];
     smell:Smell;
     accel:Vec2;
+    ang_accel:float;
 }
 
 table Observations {

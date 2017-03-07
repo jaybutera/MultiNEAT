@@ -87,7 +87,7 @@ params.Elitism = 0.1
 rng = NEAT.RNG()
 rng.TimeSeed()
 
-input_size = 1
+input_size = 2
 # Smell inputs
 inputs=[(x,-1.,0.) for x in np.linspace(-.3,.3,input_size)]
 # Acceleration inputs
@@ -163,6 +163,7 @@ def step_nn (o): # o is observation
         #o.Smell().Protein(), \
         #o.Smell().Starch(), \
         o.Smell().Fat(), \
+        o.AngAccel(),
         o.Accel().X(), \
         o.Accel().Y(),
         1]
@@ -210,6 +211,7 @@ def gen_actions (iter, observations, builder):
             #o.Smell().Protein(), \
             #o.Smell().Starch(), \
             o.Smell().Fat(), \
+            o.AngAccel(),
             o.Accel().X(), \
             o.Accel().Y(),
             1.0]
