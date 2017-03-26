@@ -123,6 +123,7 @@ port = sys.argv[1]
 
 # Open log file
 f = open('log.txt', 'w')
+fit_f = open('fit_log.txt', 'w')
 
 # ZMQ
 context = zmq.Context()
@@ -387,6 +388,7 @@ while True: # Never ending generations
                 "Best fitness in history: %d\n" % pop.GetBestFitnessEver()
     print epoch_log
     f.write(epoch_log)
+    fit_f.write( str(best_genome.GetFitness()) + '\n' )
 
 
     # Visualize best network's Genome
@@ -410,3 +412,4 @@ while True: # Never ending generations
     continue
 
 f.close()
+fit_f.close()
