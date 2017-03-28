@@ -9,17 +9,9 @@ import cv2
 import numpy as np
 import pickle as pickle
 import MultiNEAT as NEAT
-import zmq
-import flatbuffers
-from flatbuffers import number_types as N
-import AI.Store.Ids as s_i
-import AI.Obs.Observations as o_fb
-import AI.Obs.Creature as o_c
-import AI.Obs.Epoch as e_fb
-import AI.Control.Actions as c_a
-import AI.Control.Move as c_m
 from MultiNEAT import GetGenomeList, ZipFitness
 from MultiNEAT import EvaluateGenomeList_Serial
+from fb_api import EvoComm
 
 import concurrent.futures
 #from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -125,12 +117,6 @@ port = sys.argv[1]
 f = open('log.txt', 'w')
 fit_f = open('fit_log.txt', 'w')
 
-# ZMQ
-context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind('tcp://*:%s' % port)
-#socket.connect('tcp://localhost:'+port)
-
 # Time benchmark decortator
 def st_time(func):
     """
@@ -180,84 +166,6 @@ def step_nn (o): # o is observation
     return outs
 
 
-def gen_actions (iter, observations, builder):
-    creat_actions = []
-
-    #t1 = time.time()
-    #actions = []
-    #executor = concurrent.futures.ProcessPoolExecutor(8)
-    #futures = [executor.submit(step_nn, o) for o in observations]
-
-    '''
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        for o, outs in zip(observations, executor.map(step_nn, observations)):
-            net_id = o.Id()
-
-            c_m.MoveStartOutputVector(builder, output_size)
-            #for out in outs:
-            for o in outs:
-                builder.PrependFloat32(o);
-
-            output = builder.EndVector(output_size)
-
-            # Store move table in py list
-            c_m.MoveStart(builder)
-            c_m.MoveAddId(builder, net_id)
-            c_m.MoveAddOutput(builder, output)
-            creat_actions.append( c_m.MoveEnd(builder) )
-
-
-    '''
-    for o in observations:
-        net_id = o.Id()
-
-        inp_vec = [ \
-            #o.Smell().Protein(), \
-            #o.Smell().Starch(), \
-            o.Smell().Fat(), \
-            o.AngAccel(),
-            o.Accel().X(), \
-            o.Accel().Y(),
-            1.0]
-
-        net = nets[net_id]
-        net.Input(inp_vec)
-        net.Activate()
-        outs = net.Output()
-        #print '[{0}] : {1}'.format(net_id, outs)
-
-        c_m.MoveStartOutputVector(builder, output_size)
-        #for out in outs:
-        for o in outs:
-            builder.PrependFloat32(o);
-
-        output = builder.EndVector(output_size)
-
-        # Store move table in py list
-        c_m.MoveStart(builder)
-        c_m.MoveAddId(builder, net_id)
-        c_m.MoveAddOutput(builder, output)
-        creat_actions.append( c_m.MoveEnd(builder) )
-
-    #t2 = time.time()
-    #print 'ANN sim (s) - {0}'.format(t2-t1)
-
-    t1 = time.time()
-    num_creats = len(creat_actions)
-    c_a.ActionsStartActionVector(builder, num_creats)
-
-    for o in creat_actions:
-        builder.PrependUOffsetTRelative(o)
-
-    action_vec = builder.EndVector(num_creats)
-    t2 = time.time()
-
-    if iter % 100 == 0:
-        print "Action serialize (ms)=%s" % ((t2 - t1)*1000)
-
-    return action_vec
-
-
 g = NEAT.Genome(0,
                 substrate.GetMinCPPNInputs()+1, # +1 for bias
                 0,
@@ -273,16 +181,15 @@ pop = NEAT.Population(g, params, True, 1.0, 0)
 # Initialize flat buffers builder
 #builder = flatbuffers.Builder(1024)
 
-while True:
-    msg = socket.recv()
-    if msg == 'start':
-        break
 
+comm = EvoComm()
+
+# Connect to simulator
+comm.connect(port)
 print 'connected...'
 
 #for generation in range(1000):
 while True: # Never ending generations
-    builder = flatbuffers.Builder(2048)
     iteration = 0
     # Evaluate genomes
     genome_list = NEAT.GetGenomeList(pop)
@@ -299,88 +206,41 @@ while True: # Never ending generations
         g.BuildESHyperNEATPhenotype(net, substrate, params)
         nets[g.GetID()] = net
 
-
-    # Build id vector in fbuf
-    num_ids = len(nets)
-    s_i.IdsStartIdvecVector(builder, num_ids)
-
-    for i in reversed( nets.keys() ):
-        builder.PrependUint16(i)
-
-    idvec = builder.EndVector(num_ids)
-
-    # Build ids fbuf
-    s_i.IdsStart(builder)
-    s_i.IdsAddIdvec(builder, idvec)
-    ids_offset = s_i.IdsEnd(builder)
-    builder.Finish(ids_offset)
-
-    # Send out ids vector
-    ids_fb = builder.Output()
-    socket.send(ids_fb)
+    # send ids to simulator
+    comm.send_ids(nets)
 
     # Step process
     while True:
-        buf = socket.recv()
+
+        # Get observations from simulator
+        observations = comm.get_obs()
 
         # Epoch
-        if ('epoch' in buf):
-            socket.send('recieved')
+        if ('epoch' in observations):
+            fit_scores = comm.next_epoch()
+            # Apply fitness scores
+            [genome_dict[s.Id()].SetFitness(s.Fitness()) for s in fit_scores]
+
             break
 
-        # Build observations list
-        obs_timer = st_time( fb_obs )
-        observations = obs_timer(iteration, buf)
+        # Generate actions (net_id, action)
+        action = {}
+        for net_id, inp_vec in observations.iteritems():
+            net = nets[net_id]
+            net.Input(inp_vec)
+            net.Activate()
+            outs = net.Output()
 
-        # Check that input size in simulation matches server assumption
-        '''
-        i_size = observations[0].ViewLength()
-        if i_size != input_size:
-            print 'Confiured input size [{0}] does not match client input size [{1}]\nCrashing...'.format(input_size, i_size)
-            break
-        '''
+            action[net_id] = outs
 
-        # Simulate ANNs and generate fb action vector
-        t_begin = time.time()
-        a_timer = st_time( gen_actions )
-        action_vec = a_timer (iteration, observations, builder)
+        # Send actions to simulator
+        comm.send_actions(action)
 
-        # Build Actions table
-        t1 = time.time()
-        c_a.ActionsStart(builder)
-        c_a.ActionsAddAction(builder, action_vec)
-        a_offset = c_a.ActionsEnd(builder)
-        builder.Finish(a_offset)
-
-        action_fb = builder.Output()
-
-        socket.send(action_fb)
-        t2 = time.time()
-
-        if (iteration % 100 == 0):
-            print "Build time: {0}".format((t2-t1)*1000)
-            print "Total time: {0}".format((t2-t_begin)*1000)
-        #outputs['actions'] = action
-        #socket.send_json(outputs)
         iteration += 1
-
-    buf = socket.recv()
-
-    # Apply fitness scores
-    epoch = e_fb.Epoch.GetRootAsEpoch(buf, 0)
-    score_len = epoch.ScoreLength()
-
-    fit_scores = [epoch.Score(i) for i in range(score_len)]
-    [genome_dict[s.Id()].SetFitness(s.Fitness()) for s in fit_scores]
 
     # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
 
     # Print best fitness
-    '''
-    print("---------------------------")
-    print("Generation: {0}".format(pop.GetGeneration()) )
-    print("max ", max([x.GetLeader().GetFitness() for x in pop.Species]))
-    '''
     best_genome = pop.GetBestGenome()
     epoch_log = "---------------------------\n" + \
                 'Generation: %d\n' % pop.GetGeneration() + \
