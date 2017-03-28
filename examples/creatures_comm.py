@@ -215,8 +215,9 @@ while True: # Never ending generations
         # Get observations from simulator
         observations = comm.get_obs()
 
-        # Epoch
-        if ('epoch' in observations):
+        # Epoch if observations empty
+        if not observations:
+            print 'next epoch'
             fit_scores = comm.next_epoch()
             # Apply fitness scores
             [genome_dict[s.Id()].SetFitness(s.Fitness()) for s in fit_scores]

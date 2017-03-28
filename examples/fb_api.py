@@ -35,6 +35,9 @@ class EvoComm (object):
         self.socket.send(ids_fb)
 
     def next_epoch(self):
+        # Reset buffer
+        self.builder = flatbuffers.Builder(2048)
+
         # Notify simulator of complete epoch
         self.socket.send('recieved')
 
@@ -119,6 +122,10 @@ class EvoComm (object):
     def get_obs (self):
         # Get observations
         buf = self.socket.recv()
+
+        # Check if end epoch signal
+        if ('epoch' in buf):
+            return []
 
         #t1 = time.time()
         obs = o_fb.Observations.GetRootAsObservations(buf, 0)
