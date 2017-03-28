@@ -14,8 +14,6 @@ from MultiNEAT import EvaluateGenomeList_Serial
 from fb_api import EvoComm
 
 import concurrent.futures
-#from concurrent.futures import ProcessPoolExecutor, as_completed
-#executor = ProcessPoolExecutor(4)
 
 params = NEAT.Parameters()
 params.PopulationSize = 32
@@ -117,55 +115,6 @@ port = sys.argv[1]
 f = open('log.txt', 'w')
 fit_f = open('fit_log.txt', 'w')
 
-# Time benchmark decortator
-def st_time(func):
-    """
-        st decorator to calculate the total time of a func
-    """
-
-    def st_func(iter, *args, **keyArgs):
-        t1 = time.time()
-        r = func(iter, *args, **keyArgs)
-        t2 = time.time()
-        if iter % 100 == 0:
-            print "Function=%s, Time (ms)=%s" % (func.__name__, (t2 - t1)*1000)
-        return r
-
-    return st_func
-
-'''
-Encapsulate observations fb message
-'''
-def fb_obs (iter, buf):
-    t1 = time.time()
-    obs = o_fb.Observations.GetRootAsObservations(buf, 0)
-    obs_len = obs.ObsLength()
-
-    observations = [obs.Obs(i) for i in range(obs_len)]
-    t2 = time.time()
-
-    return observations
-
-def step_nn (o): # o is observation
-    net_id = o.Id()
-
-    inp_vec = [ \
-        #o.Smell().Protein(), \
-        #o.Smell().Starch(), \
-        o.Smell().Fat(), \
-        o.AngAccel(),
-        o.Accel().X(), \
-        o.Accel().Y(),
-        1]
-
-    net = nets[net_id]
-    net.Input(inp_vec)
-    net.Activate()
-    outs = net.Output()
-
-    return outs
-
-
 g = NEAT.Genome(0,
                 substrate.GetMinCPPNInputs()+1, # +1 for bias
                 0,
@@ -178,19 +127,21 @@ g = NEAT.Genome(0,
 
 pop = NEAT.Population(g, params, True, 1.0, 0)
 
-# Initialize flat buffers builder
-#builder = flatbuffers.Builder(1024)
-
-
+# Communictor to simulator
 comm = EvoComm()
 
 # Connect to simulator
 comm.connect(port)
 print 'connected...'
 
-#for generation in range(1000):
+
+'''
+BEGIN EVOLUTION
+'''
+
 while True: # Never ending generations
     iteration = 0
+
     # Evaluate genomes
     genome_list = NEAT.GetGenomeList(pop)
 
@@ -207,17 +158,16 @@ while True: # Never ending generations
         nets[g.GetID()] = net
 
     # send ids to simulator
-    comm.send_ids(nets)
+    ids = nets.keys()
+    comm.send_ids(ids)
 
     # Step process
     while True:
-
         # Get observations from simulator
         observations = comm.get_obs()
 
-        # Epoch if observations empty
+        # Next epoch if observations empty
         if not observations:
-            print 'next epoch'
             fit_scores = comm.next_epoch()
             # Apply fitness scores
             [genome_dict[s.Id()].SetFitness(s.Fitness()) for s in fit_scores]
@@ -239,7 +189,10 @@ while True: # Never ending generations
 
         iteration += 1
 
-    # print('Gen: %d Best: %3.5f' % (generation, max(fitnesses)))
+
+    '''
+    LOGGING AND VISUALS
+    '''
 
     # Print best fitness
     best_genome = pop.GetBestGenome()
@@ -268,6 +221,8 @@ while True: # Never ending generations
     NEAT.DrawPhenotype(img, (0, 0, 500, 500), net, substrate=True)
     cv2.imshow("NN", img)
     cv2.waitKey(1)
+
+    #
 
     pop.Epoch()
     continue

@@ -9,17 +9,29 @@ import AI.Obs.Epoch as e_fb
 import AI.Control.Actions as c_a
 import AI.Control.Move as c_m
 
+'''
+    Communicate with a simulator API via flatbuffers and zeromq.
+    Works in a replace-all evolution strategy.
+
+    Method descriptions
+    -------------------
+    send_ids(ids)         - send id list to the server
+    next_epoch            - acknowledge end epoch request from simulator and get fitness scores
+    connect               - connect to simulator via zeromq
+    send_actions(actions) - send brain outputs to simulator for actions
+    get_obs()             - recieve creature observations from simulator
+'''
 class EvoComm (object):
     def __init__ (self):
         self.iteration = 0
         self.builder = flatbuffers.Builder(2048)
 
-    def send_ids (self, nets):
+    def send_ids (self, ids):
         # Build id vector in fbuf
-        num_ids = len(nets)
+        num_ids = len(ids)
         s_i.IdsStartIdvecVector(self.builder, num_ids)
 
-        for i in reversed( nets.keys() ):
+        for i in reversed( ids ):
             self.builder.PrependUint16(i)
 
         idvec = self.builder.EndVector(num_ids)
@@ -38,7 +50,7 @@ class EvoComm (object):
         # Reset buffer
         self.builder = flatbuffers.Builder(2048)
 
-        # Notify simulator of complete epoch
+        # Acknowledge next epoch signal
         self.socket.send('recieved')
 
         # Get fitness scores
@@ -116,9 +128,6 @@ class EvoComm (object):
 
         self.iteration += 1
 
-    '''
-    Encapsulate observations fb message
-    '''
     def get_obs (self):
         # Get observations
         buf = self.socket.recv()
