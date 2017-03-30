@@ -23,15 +23,12 @@ class NeuralNet(object):
 
     def activate (self, inputs):
         inputs = np.concatenate((inputs, np.array([1.])), axis=0)
-        print inputs.shape
-        print '-'
         in_b = np.array( inputs ) # inputs and bias
 
         a = np.dot(in_b, self.w_inp_out)
         return self.threshold( a )
 
 def tourn_select (fit_scores, pop):
-    print 'tourn_select'
     global k
 
     # Error checking
@@ -66,7 +63,6 @@ def tourn_select (fit_scores, pop):
         # Get sorted fitnesses of group (least fit to most)
         group_ids = [i[0] for i in group]
         #group_fits = [(s.Id(), s.Fitness()) for s in fit_scores if s.Id() in group_ids]
-        print 'lookin for group_fits'
         group_fits = [ (net_id, fit_scores[net_id]) for net_id in group_ids]
         group_fits.sort(key=lambda tup: tup[0])
 
@@ -112,14 +108,14 @@ def mutate (net):
     rand_choice = np.random.rand(net.in_size, net.out_size)
 
     # Random chance to mutate
-    for i in range( net.in_size-1 ):
-        for j in range( net.out_size-1 ):
+    for i in range(net.in_size-1 ):
+        for j in range(net.out_size ):
             if (random.random() < mutate_prob):
                 net.w_inp_out[i][j] = random.random()
 
 
 k = 4
-pop_size = 1
+pop_size = 10
 input_size = 5
 output_size = 1
 
@@ -130,7 +126,7 @@ env = gym.make('CartPole-v0')
 pop = {i:NeuralNet(input_size,0,output_size) for i in range(pop_size)}
 
 
-for epoch in range(10):
+for epoch in range(100):
     fit_scores = {}
 
     # Run simulations
@@ -139,7 +135,8 @@ for epoch in range(10):
         sum_reward = 0
 
         for _ in range(1000):
-            env.render()
+            #if epoch == 9:
+            #env.render()
 
             action = net.activate( obs )[0]
             obs, reward, done, info = env.step( action )
