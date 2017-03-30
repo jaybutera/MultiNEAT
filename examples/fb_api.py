@@ -59,7 +59,7 @@ class EvoComm (object):
         epoch = e_fb.Epoch.GetRootAsEpoch(buf, 0)
         score_len = epoch.ScoreLength()
 
-        fit_scores = [epoch.Score(i) for i in range(score_len)]
+        fit_scores = {epoch.Score(i).Id() : epoch.Score(i).Fitness() for i in range(score_len)}
         return fit_scores
 
     def connect (self, port):

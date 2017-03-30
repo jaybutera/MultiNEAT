@@ -27,6 +27,14 @@ class NeuralNet(object):
         return self.sigmoid( a )
 
 def tourn_select (fit_scores, pop):
+    print 'tourn_select'
+    global k
+
+    # Error checking
+    num_creats = len( pop.keys() )
+    if k > num_creats:
+        k = num_creats
+
     k_groups = [[] for i in range(k)]
 
     # Split creatures into categories
@@ -42,7 +50,7 @@ def tourn_select (fit_scores, pop):
         p2 = random.choice(group)[1]
 
         # Make sure the parents aren't the same
-        while p2 == p1:
+        while p2 == p1 and num_creats > 1:
             p2 = random.choice(group)[1]
 
         # Make children
@@ -53,7 +61,9 @@ def tourn_select (fit_scores, pop):
 
         # Get sorted fitnesses of group (least fit to most)
         group_ids = [i[0] for i in group]
-        group_fits = [(s.Id(), s.Fitness()) for s in fit_scores if s.Id() in group_ids]
+        #group_fits = [(s.Id(), s.Fitness()) for s in fit_scores if s.Id() in group_ids]
+        print 'lookin for group_fits'
+        group_fits = [ (net_id, fit_scores[net_id]) for net_id in group_ids]
         group_fits.sort(key=lambda tup: tup[0])
 
         # Replace 2 least fit with children
@@ -106,7 +116,7 @@ def mutate (net):
 
 
 k = 4
-pop_size = 32
+pop_size = 1
 input_size = 6
 output_size = 2
 # Generate population
