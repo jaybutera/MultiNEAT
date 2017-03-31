@@ -30,6 +30,7 @@ class NeuralNet(object):
 
 def tourn_select (fit_scores, pop):
     global k
+    global id_counter
 
     # Error checking
     num_creats = len( pop.keys() )
@@ -42,17 +43,19 @@ def tourn_select (fit_scores, pop):
     for i, creature in enumerate(pop.iteritems()):
         k_groups[ i % k ].append( creature )
 
+    print 'k groups:'
+    print k_groups
+
     # New empty pop
     newpop = {}
 
-    for group in k_groups:
+    for i, group in enumerate(k_groups):
         # Randomly choose parents
-        p1 = random.choice(group)[1]
-        p2 = random.choice(group)[1]
+        idx_choices = np.random.choice([i for i in range(len(group))], 2, replace=True)
+        p1 = group[ idx_choices[0] ][1]
+        p2 = group[ idx_choices[1] ][1]
 
-        # Make sure the parents aren't the same
-        while p2 == p1 and num_creats > 1:
-            p2 = random.choice(group)[1]
+        print 'from group ', i, ': p1-', group[ idx_choices[0] ][0] , ' p2-', group[idx_choices[1]][0]
 
         # Make children
         c1 = crossover(p1, p2)
@@ -72,9 +75,11 @@ def tourn_select (fit_scores, pop):
         id2 = group_fits[0][1]
         for x in group:
             if (x[0] == id1):
-                x = (x[0], c1) # Replace net with c1 and same id
+                x = (id_counter, c1) # Replace net with c1
+                id_counter += 1
             elif (x[0] == id2):
-                x = (x[0], c2) # Replace net with c1 and same id
+                x = (id_counter, c2) # Replace net with c2
+                id_counter += 1
 
             pop[ x[0] ] = x[1]
 
@@ -85,7 +90,7 @@ def crossover(p1, p2):
     assert (p1.out_size == p2.out_size), "Parent net output sizes don't match"
 
     # Random submatrix for crossover
-    top_left_x_point = (random.randint(0, p1.in_size-1),
+    top_left_x_point = (random.randint(0, p1.in_size/2),
                         random.randint(0, p1.out_size-1))
     bot_right_x_point = (random.randint(top_left_x_point[0], p1.in_size-1),
                          random.randint(top_left_x_point[1], p1.out_size-1))
@@ -123,14 +128,22 @@ output_size = 1
 n1 = NeuralNet(input_size,0,output_size)
 n2 = NeuralNet(input_size,0,output_size)
 
+'''
+print n1.w_inp_out
+print n2.w_inp_out
+print crossover(n1,n2).w_inp_out
+'''
+
 
 env = gym.make('CartPole-v0')
 
 # Generate population
-pop = {i:NeuralNet(input_size,0,output_size) for i in range(pop_size)}
+pop = {i: NeuralNet(input_size,0,output_size) for i in range(pop_size)}
+# Start global id iterator
+id_counter = pop_size
 
 
-for epoch in range(100):
+for epoch in range(1):
     fit_scores = {}
 
     # Run simulations
