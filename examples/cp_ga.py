@@ -43,9 +43,6 @@ def tourn_select (fit_scores, pop):
     for i, creature in enumerate(pop.iteritems()):
         k_groups[ i % k ].append( creature )
 
-    print 'k groups:'
-    print k_groups
-
     # New empty pop
     newpop = {}
 
@@ -55,8 +52,6 @@ def tourn_select (fit_scores, pop):
         p1 = group[ idx_choices[0] ][1]
         p2 = group[ idx_choices[1] ][1]
 
-        print 'from group ', i, ': p1-', group[ idx_choices[0] ][0] , ' p2-', group[idx_choices[1]][0]
-
         # Make children
         c1 = crossover(p1, p2)
         mutate(c1)
@@ -65,14 +60,13 @@ def tourn_select (fit_scores, pop):
 
         # Get sorted fitnesses of group (least fit to most)
         group_ids = [i[0] for i in group]
-        #group_fits = [(s.Id(), s.Fitness()) for s in fit_scores if s.Id() in group_ids]
         group_fits = [ (net_id, fit_scores[net_id]) for net_id in group_ids]
-        group_fits.sort(key=lambda tup: tup[0])
+        group_fits.sort(key=lambda tup: tup[1])
 
         # Replace 2 least fit with children
         # Add all nets in group to pop
         id1 = group_fits[0][0]
-        id2 = group_fits[0][1]
+        id2 = group_fits[1][0]
         for x in group:
             if (x[0] == id1):
                 x = (id_counter, c1) # Replace net with c1
@@ -96,14 +90,12 @@ def crossover(p1, p2):
                          random.randint(top_left_x_point[1], p1.out_size-1))
 
     # Make child
-    #c = NeuralNet(p1.in_size, p1.hid_size, p1.out_size)
     c = copy.deepcopy(p1)
 
     # Perform crossover
     # Replace random submatrix of p1 to p2
     for i in range(top_left_x_point[0], bot_right_x_point[0]+1):
         for j in range(top_left_x_point[1], bot_right_x_point[1]+1):
-            #print 'assign p2 @ ({0},{1})'.format(i,j)
             c.w_inp_out[i][j] = p2.w_inp_out[i][j]
 
     return c
@@ -128,12 +120,6 @@ output_size = 1
 n1 = NeuralNet(input_size,0,output_size)
 n2 = NeuralNet(input_size,0,output_size)
 
-'''
-print n1.w_inp_out
-print n2.w_inp_out
-print crossover(n1,n2).w_inp_out
-'''
-
 
 env = gym.make('CartPole-v0')
 
@@ -143,7 +129,7 @@ pop = {i: NeuralNet(input_size,0,output_size) for i in range(pop_size)}
 id_counter = pop_size
 
 
-for epoch in range(1):
+for epoch in range(100):
     fit_scores = {}
 
     # Run simulations
@@ -151,7 +137,7 @@ for epoch in range(1):
         obs = env.reset()
         sum_reward = 0
 
-        for _ in range(1000):
+        for _ in range(5000):
             #if epoch == 9:
             #env.render()
 
