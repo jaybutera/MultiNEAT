@@ -13,7 +13,7 @@ class NeuralNet(object):
         # ------------
 
         # Inputs to outputs
-        self.w_inp_out = np.random.rand(in_size, out_size) # plus 1 for bias
+        self.w_inp_out = np.random.rand(self.in_size, self.out_size) # plus 1 for bias
 
     def sigmoid (self, x):
         return np.divide(1., np.add(1, np.exp(-x)))
@@ -96,8 +96,9 @@ def crossover(p1, p2):
 
     # Perform crossover
     # Replace random submatrix of p1 to p2
-    for i in range(bot_right_x_point[0], top_left_x_point[0]):
-        for j in range(bot_right_x_point[1], top_left_x_point[1]):
+    for i in range(top_left_x_point[0], bot_right_x_point[0]+1):
+        for j in range(top_left_x_point[1], bot_right_x_point[1]+1):
+            #print 'assign p2 @ ({0},{1})'.format(i,j)
             c.w_inp_out[i][j] = p2.w_inp_out[i][j]
 
     return c
@@ -116,8 +117,11 @@ def mutate (net):
 
 k = 4
 pop_size = 10
-input_size = 5
+input_size = 4
 output_size = 1
+
+n1 = NeuralNet(input_size,0,output_size)
+n2 = NeuralNet(input_size,0,output_size)
 
 
 env = gym.make('CartPole-v0')
